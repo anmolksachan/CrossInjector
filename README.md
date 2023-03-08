@@ -30,6 +30,19 @@ python CrossInjector.py -p <path-to-payloads-file> -u <path-to-urls-file>
 Replace <path-to-payloads-file> with the path to a file containing XSS payloads, and <path-to-urls-file> with the path to a file containing a list of URLs to scan.
 ```
 
+### Contact
+
+Shoot my DM : [@FR13ND0x7F](https://twitter.com/fr13nd0x7f)
+
+### Special Thanks
+Lots of online resources.
+
+### Note
+There are none so far.
+
+## __Want to support my work?__
+Give me a Star in the repository or follow me [@FR13ND0x7F](https://twitter.com/fr13nd0x7f) , thats enough for me :P
+
 ## License
 
 CrossInjector is licensed under the MIT License.
