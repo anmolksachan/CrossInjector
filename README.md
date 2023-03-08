@@ -1,5 +1,7 @@
 # CrossInjector by @FR13ND0x7f
 
+![DEMO](https://miro.medium.com/v2/resize:fit:1400/1*bFHpFohtx5vpdiFggMYizw.gif)
+
 CrossInjector is a Python tool to scan a list of URLs for Cross-Site Scripting (XSS) vulnerabilities. It uses Selenium WebDriver and ChromeDriver to execute JavaScript code and identify if a given URL is vulnerable to XSS attacks.
 
 ## Prerequisites
