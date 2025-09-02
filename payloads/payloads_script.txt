@@ -1,0 +1,4 @@
+';alert('XSS');//
+';alert('XSS')//
+;alert('XSS');
+alert('XSS');
