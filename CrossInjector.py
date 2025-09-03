@@ -1,16 +1,22 @@
 import os
 import sys
+import json
 import requests
 import argparse
 import time
 import urllib.parse as urlparse
+from urllib.parse import urljoin
 from termcolor import colored
 from urllib.parse import parse_qs
+from bs4 import BeautifulSoup
 
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.service import Service
     from webdriver_manager.chrome import ChromeDriverManager
+    from selenium.common.exceptions import NoAlertPresentException, TimeoutException
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
 except ImportError:
     print("Selenium and webdriver_manager modules not found. Please make sure they are installed.")
     sys.exit(1)
@@ -85,10 +91,13 @@ def get_urls_from_file(file_path):
         urls = f.read().splitlines()
     return urls
 
-# Function to get all the XSS payloads from a given file
-def get_payloads_from_file(file_path):
-    with open(file_path, "r") as f:
-        payloads = f.read().splitlines()
+# Function to get all the XSS payloads from a given directory
+def get_payloads_from_directory(directory_path):
+    payloads = []
+    for filename in os.listdir(directory_path):
+        if filename.endswith(".txt"):
+            with open(os.path.join(directory_path, filename), "r") as f:
+                payloads.extend(f.read().splitlines())
     return payloads
 
 # Function to check if a given URL has a query string
@@ -113,50 +122,66 @@ def inject_payload(url, payload, context="get"):
         return urlparse.urlunparse(url_parts)
     return url
 
-# Function to scan a given URL for XSS vulnerabilities
-# Function to scan a given URL for XSS vulnerabilities
-def scan_url(url, payloads, driver):
+# Function to scan a given URL for GET-based XSS vulnerabilities
+def scan_get(url, payloads):
     vulnerable_urls = []
     for payload in payloads:
-        # Test GET parameters
-        if main.args.scan_get:
-            get_url = inject_payload(url, payload)
+        get_url = inject_payload(url, payload)
+        try:
             if payload in requests.get(get_url).text:
                 print(colored(f"[VULNERABLE - GET] {get_url}", "red"))
-                vulnerable_urls.append(get_url)
+                vulnerable_urls.append({"url": get_url, "type": "GET", "payload": payload})
             else:
                 print(colored(f"[NOT VULNERABLE - GET] {get_url}", "green"))
+        except requests.exceptions.RequestException:
+            pass
+    return vulnerable_urls
 
-        # Test POST form data
-        if main.args.scan_post and has_query_string(url):
-            form_data = {key: f"{value[0]}{payload}" for key, value in parse_qs(urlparse.urlparse(url).query).items()}
-            try:
-                if payload in requests.post(url, data=form_data).text:
-                    print(colored(f"[VULNERABLE - POST Form] {url} with payload {payload}", "red"))
-                    vulnerable_urls.append(f"{url} - POST Form - {payload}")
-                else:
-                    print(colored(f"[NOT VULNERABLE - POST Form] {url} with payload {payload}", "green"))
-            except requests.exceptions.RequestException:
-                pass
+# Function to extract forms from a URL
+def get_forms(url):
+    try:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, "html.parser")
+        return soup.find_all("form")
+    except requests.exceptions.RequestException:
+        return []
 
-        # Test POST JSON
-        if main.args.scan_post and has_query_string(url):
-            json_data = {key: f"{value[0]}{payload}" for key, value in parse_qs(urlparse.urlparse(url).query).items()}
-            try:
-                if payload in requests.post(url, json=json_data).text:
-                    print(colored(f"[VULNERABLE - POST JSON] {url} with payload {payload}", "red"))
-                    vulnerable_urls.append(f"{url} - POST JSON - {payload}")
-                else:
-                    print(colored(f"[NOT VULNERABLE - POST JSON] {url} with payload {payload}", "green"))
-            except requests.exceptions.RequestException:
-                pass
+# Function to scan for POST-based XSS in forms
+def scan_post_forms(url, payloads):
+    vulnerable_urls = []
+    forms = get_forms(url)
+    if not forms:
+        return vulnerable_urls
 
-    if vulnerable_urls:
-        driver.execute_script("window.open('');")
-        driver.switch_to.window(driver.window_handles[-1])
-        for vulnerable_url in vulnerable_urls:
-            if vulnerable_url.startswith("http"):
-                driver.get(vulnerable_url)
+    print(colored(f"[INFO] Found {len(forms)} forms on {url}", "blue"))
+    for form in forms:
+        action = form.get("action")
+        method = form.get("method", "get").lower()
+
+        if method != "post":
+            continue
+
+        action_url = urljoin(url, action)
+        inputs = form.find_all(["input", "textarea", "select"])
+        form_data = {}
+        for i in inputs:
+            name = i.get("name")
+            value = i.get("value", "")
+            form_data[name] = value
+
+        for payload in payloads:
+            for input_name in form_data.keys():
+                if not input_name:
+                    continue
+                data_to_send = form_data.copy()
+                data_to_send[input_name] = payload
+                try:
+                    response = requests.post(action_url, data=data_to_send)
+                    if payload in response.text:
+                        print(colored(f"[VULNERABLE - POST Form] {action_url} with payload in '{input_name}'", "red"))
+                        vulnerable_urls.append({"url": action_url, "type": "POST", "parameter": input_name, "payload": payload})
+                except requests.exceptions.RequestException as e:
+                    print(colored(f"[ERROR] Failed to submit form to {action_url}: {e}", "yellow"))
     return vulnerable_urls
 
 # Function to scan for path-based XSS
@@ -164,11 +189,14 @@ def scan_path(url, payloads):
     vulnerable_urls = []
     for payload in payloads:
         path_url = inject_payload(url, payload, context="path")
-        if payload in requests.get(path_url).text:
-            print(colored(f"[VULNERABLE - Path] {path_url}", "red"))
-            vulnerable_urls.append(path_url)
-        else:
-            print(colored(f"[NOT VULNERABLE - Path] {path_url}", "green"))
+        try:
+            if payload in requests.get(path_url).text:
+                print(colored(f"[VULNERABLE - Path] {path_url}", "red"))
+                vulnerable_urls.append({"url": path_url, "type": "Path", "payload": payload})
+            else:
+                print(colored(f"[NOT VULNERABLE - Path] {path_url}", "green"))
+        except requests.exceptions.RequestException:
+            pass
     return vulnerable_urls
 
 # Function to scan for XSS in request headers
@@ -181,7 +209,7 @@ def scan_headers(url, payloads):
             try:
                 if payload in requests.get(url, headers=headers).text:
                     print(colored(f"[VULNERABLE - Header {header}] {url} with payload {payload}", "red"))
-                    vulnerable_urls.append(f"{url} - Header {header} - {payload}")
+                    vulnerable_urls.append({"url": url, "type": "Header", "header": header, "payload": payload})
                 else:
                     print(colored(f"[NOT VULNERABLE - Header {header}] {url} with payload {payload}", "green"))
             except requests.exceptions.RequestException:
@@ -195,10 +223,13 @@ def scan_cookie(url, payloads, driver):
         driver.get(url)
         driver.add_cookie({"name": "xss", "value": payload})
         driver.refresh()
-        if payload in driver.page_source:
+        try:
+            WebDriverWait(driver, 3).until(EC.alert_is_present())
+            alert = driver.switch_to.alert
+            alert.accept()
             print(colored(f"[VULNERABLE - Cookie] {url} with payload {payload}", "red"))
-            vulnerable_urls.append(f"{url} - Cookie - {payload}")
-        else:
+            vulnerable_urls.append({"url": url, "type": "Cookie", "payload": payload})
+        except (NoAlertPresentException, TimeoutException):
             print(colored(f"[NOT VULNERABLE - Cookie] {url} with payload {payload}", "green"))
     return vulnerable_urls
 
@@ -208,19 +239,20 @@ def scan_fragment(url, payloads, driver):
     for payload in payloads:
         fragment_url = f"{url}#{payload}"
         driver.get(fragment_url)
-        # This is a simple check. A more robust solution would involve
-        # checking for script execution or other DOM manipulations.
-        if payload in driver.page_source:
+        try:
+            WebDriverWait(driver, 3).until(EC.alert_is_present())
+            alert = driver.switch_to.alert
+            alert.accept()
             print(colored(f"[VULNERABLE - Fragment] {fragment_url}", "red"))
-            vulnerable_urls.append(fragment_url)
-        else:
+            vulnerable_urls.append({"url": fragment_url, "type": "Fragment", "payload": payload})
+        except (NoAlertPresentException, TimeoutException):
             print(colored(f"[NOT VULNERABLE - Fragment] {fragment_url}", "green"))
     return vulnerable_urls
 
 # Function to write vulnerable URLs to a file
 def write_vulnerable_urls_to_file(file_path, urls):
     with open(file_path, "w") as f:
-        f.write("\n".join(urls))
+        json.dump(urls, f, indent=4)
 
 # Main function
 def main():
@@ -239,7 +271,7 @@ def main():
     """)
     print(colored('                                  Coded with Love by Anmol K Sachan @Fr13ND0x7f\n','green')) 
     parser = argparse.ArgumentParser(description="Scan a list of URLs for XSS vulnerabilities")
-    parser.add_argument("-p", "--payloads", required=True, help="File containing XSS payloads")
+    parser.add_argument("-p", "--payloads", required=True, help="Directory containing XSS payloads")
     parser.add_argument("-u", "--urls", required=True, help="File containing list of URLs")
     parser.add_argument("--scan-get", action="store_true", help="Scan GET parameters")
     parser.add_argument("--scan-post", action="store_true", help="Scan POST parameters")
@@ -250,13 +282,17 @@ def main():
     main.args = parser.parse_args()
 
     urls = get_urls_from_file(main.args.urls)
-    payloads = get_payloads_from_file(main.args.payloads)
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    s = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=s, options=options)
+    payloads = get_payloads_from_directory(main.args.payloads)
+
+    driver = None
+    if main.args.scan_cookie or main.args.scan_fragment:
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        s = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=s, options=options)
+
     affected_targets = []
     for url in urls:
         if not is_alive(url):
@@ -264,8 +300,10 @@ def main():
             continue
         print(colored(f"[SCANNING] {url}", "blue"))
         all_vulnerable_urls = []
-        if main.args.scan_get or main.args.scan_post:
-            all_vulnerable_urls.extend(scan_url(url, payloads, driver))
+        if main.args.scan_get:
+            all_vulnerable_urls.extend(scan_get(url, payloads))
+        if main.args.scan_post:
+            all_vulnerable_urls.extend(scan_post_forms(url, payloads))
         if main.args.scan_path:
             all_vulnerable_urls.extend(scan_path(url, payloads))
         if main.args.scan_headers:
@@ -284,7 +322,8 @@ def main():
             print(colored(target, "red"))
     else:
         print(colored("No targets were found to be vulnerable", "green"))
-    driver.quit()
+    if driver:
+        driver.quit()
 
 if __name__ == "__main__":
     main()

